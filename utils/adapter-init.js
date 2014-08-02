@@ -54,14 +54,9 @@ function createAdapter(name, onEvent) {
         }
 
         if (settings.ioListenPort) {
-            this.socket = io.connect("127.0.0.1", {
-                port: settings.ioListenPort
-            });
+            this.socket = io("http://127.0.0.1:" + settings.ioListenPort);
         } else if (settings.ioListenPortSsl) {
-            this.socket = io.connect("127.0.0.1", {
-                port:   settings.ioListenPortSsl,
-                secure: true
-            });
+            this.socket = io("https://127.0.0.1:" + settings.ioListenPortSsl);
         } else {
             process.exit();
         }

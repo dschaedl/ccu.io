@@ -37,6 +37,7 @@ var fs =        require('fs'),
     binrpc =    require(__dirname + "/binrpc.js"),
     rega =      require(__dirname + "/rega.js"),
     express =   require('express'),
+    expressBasicAuth = require('basic-auth-connect'),
     http =      require('http'),
     https =     require('https'),
     crypto =    require('crypto'),
@@ -47,6 +48,7 @@ var fs =        require('fs'),
     scheduler = require('node-schedule'),
     mime =      require('mime'),
     os =        require('os'),
+    bodyparser = require('body-parser'),
     app,
     appSsl,
     server,
@@ -83,7 +85,7 @@ if (settings.ioListenPort) {
     app =  express();
 
     if (settings.authentication && settings.authentication.enabled) {
-        app.use(express.basicAuth(settings.authentication.user, settings.authentication.password));
+        app.use(expressBasicAuth(settings.authentication.user, settings.authentication.password));
     }
 
     server = require('http').createServer(app);
@@ -113,7 +115,7 @@ if (settings.ioListenPortSsl) {
     if (options) {
         appSsl = express();
         if (settings.authentication && settings.authentication.enabledSsl) {
-            appSsl.use(express.basicAuth(settings.authentication.user, settings.authentication.password));
+            appSsl.use(expressBasicAuth(settings.authentication.user, settings.authentication.password));
         }
         serverSsl = require('https').createServer(options, appSsl);
         if (settings.useIPv6) {
@@ -1035,6 +1037,20 @@ function restApi(req, res) {
             response = datapoints;
             status = 200;
             break;
+        case "restartScriptEngine":
+            response = "no script Engine enabled";
+            if (settings.scriptEngineEnabled) {
+                if (childScriptEngine) {
+                    childScriptEngine.kill();
+                    delete childScriptEngine;
+                }
+                setTimeout(function () {
+                    startScriptEngine();
+                }, 1500);
+                response = "restarting Script Engine";
+            }
+            status = 200;
+            break;
         default:
             response = {error: "command " + command + " unknown"};
     }
@@ -1078,7 +1094,7 @@ function initWebserver() {
         }
 
         // File Uploads
-        app.use(express.bodyParser({uploadDir: __dirname + '/tmp'}));
+        app.use(bodyparser.urlencoded({uploadDir: __dirname + '/tmp', extended: true}));
         app.post('/upload', uploadParser);
 
         app.get('/api/*', restApi);
@@ -1110,7 +1126,7 @@ function initWebserver() {
         }
 
         // File Uploads
-        appSsl.use(express.bodyParser({uploadDir: __dirname + '/tmp'}));
+        appSsl.use(bodyparser.urlencoded({uploadDir: __dirname + '/tmp', extended: true}));
         appSsl.post('/upload', uploadParser);
 
         appSsl.get('/api/*', restApi);
@@ -1363,6 +1379,7 @@ function clearRegaData() {
 }
 
 function initSocketIO(_io) {
+    /*
     _io.set('logger', {
         debug: function(obj) {
             logger.debug("socket.io: "+obj);
@@ -1377,37 +1394,38 @@ function initSocketIO(_io) {
             logger.warn("socket.io: "+obj);
         }
     });
+    */
 
-	_io.configure(function () {
+	_io.use(function (socket, next) {
+        //this.set('heartbeat timeout', 25);
+        //this.set('heartbeat interval', 10);
 
-        this.set('heartbeat timeout', 25);
-        this.set('heartbeat interval', 10);
-
-        this.set('authorization', function (handshakeData, callback) {
-            var isHttps = (serverSsl !== undefined && this.server == serverSsl);
-            if ((!isHttps && settings.authentication.enabled) || (isHttps && settings.authentication.enabledSsl)) {
-                // do not check if localhost
-                if(handshakeData.address.address.toString() == "127.0.0.1") {
-                    logger.verbose("ccu.io        local authentication " + handshakeData.address.address);
-                    callback(null, true);
-                } else
-                if (handshakeData.query["key"] === undefined || handshakeData.query["key"] != authHash) {
-                    logger.warn("ccu.io        authentication error on "+(isHttps ? "https from " : "http from ") + handshakeData.address.address);
-                    callback ("Invalid session key", false);
-                } else{
-                    logger.verbose("ccu.io        authentication successful on "+(isHttps ? "https from " : "http from ") + handshakeData.address.address);
-                    callback(null, true);
-                }
-            } else {
-               callback(null, true);
+        var handshakeData = socket.request;
+        var isHttps = (serverSsl !== undefined && this.server == serverSsl);
+        if ((!isHttps && settings.authentication.enabled) || (isHttps && settings.authentication.enabledSsl)) {
+            // do not check if localhost
+            if(handshakeData.address.address.toString() == "127.0.0.1") {
+                logger.verbose("ccu.io        local authentication " + handshakeData.address.address);
+                next();
+            } else
+            if (handshakeData.query["key"] === undefined || handshakeData.query["key"] != authHash) {
+                logger.warn("ccu.io        authentication error on "+(isHttps ? "https from " : "http from ") + handshakeData.address.address);
+                next(new Error("Invalid session key"));
+            } else{
+                logger.verbose("ccu.io        authentication successful on "+(isHttps ? "https from " : "http from ") + handshakeData.address.address);
+                next();
             }
-        });
+        } else {
+           next();
+        }
     });
 
     _io.sockets.on('connection', function (socket) {
         socketlist.push(socket);
         var address = socket.handshake.address;
-        logger.verbose("socket.io <-- " + address.address + ":" + address.port + " " + socket.transport + " connected");
+        if (address) {
+            logger.verbose("socket.io <-- " + address.address + ":" + address.port + " " + socket.transport + " connected");
+        }
 
         socket.on('log', function (sev, msg) {
            switch (sev) {
@@ -2205,7 +2223,9 @@ function initSocketIO(_io) {
 
         socket.on('disconnect', function () {
             var address = socket.handshake.address;
-            logger.verbose("socket.io <-- " + address.address + ":" + address.port + " " + socket.transport + " disconnected");
+            if (address) {
+                logger.verbose("socket.io <-- " + address.address + ":" + address.port + " " + socket.transport + " disconnected");
+            }
             socketlist.splice(socketlist.indexOf(socket), 1);
         });
 
@@ -2220,8 +2240,8 @@ function initSocketIO(_io) {
 
 function startScriptEngine() {
     var path = __dirname + "/script-engine.js";
-    logger.info("ccu.io        starting script-engine");
     childScriptEngine = childProcess.fork(path);
+    logger.info("ccu.io        starting script-engine");
 }
 
 function restartAdapter(adapter) {

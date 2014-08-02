@@ -15,8 +15,8 @@ var regaObjects = {},
     datapoints = {};
 
 var fs =        require('fs'),
-    request =   require("request"),
-    wol = require('wake_on_lan');
+    request =   require('request'),
+    wol =       require('wake_on_lan');
 
 var scriptEngine = {
     util:           require('util'),
@@ -27,6 +27,7 @@ var scriptEngine = {
     scheduler:      require('node-schedule'),
     suncalc:        require('suncalc'),
     fs:             fs,
+    scriptDir:      __dirname + '/scripts',
     socket: {},
     subscribers: [],
     schedules: [],
@@ -36,14 +37,9 @@ var scriptEngine = {
     init: function () {
         var that = this;
         if (that.settings.ioListenPort) {
-            that.socket = that.io.connect("127.0.0.1", {
-                port: that.settings.ioListenPort
-            });
+            that.socket = that.io("http://127.0.0.1:" + that.settings.ioListenPort);
         } else if (settings.ioListenPortSsl) {
-            that.socket = that.io.connect("127.0.0.1", {
-                port: that.settings.ioListenPortSsl,
-                secure: true
-            });
+            that.socket = that.io("https://127.0.0.1:" + that.settings.ioListenPortSsl);
         } else {
             process.exit();
         }
@@ -58,13 +54,13 @@ var scriptEngine = {
 
         // Fetch Data
         that.socket.emit('getIndex', function(index) {
-            that.logger.info("script-engine fetched regaIndex")
+            that.logger.info("script-engine fetched regaIndex");
             regaIndex = index;
             that.socket.emit('getObjects', function(objects) {
-                that.logger.info("script-engine fetched regaObjects")
+                that.logger.info("script-engine fetched regaObjects");
                 regaObjects = objects;
                 that.socket.emit('getDatapoints', function(dps) {
-                    that.logger.info("script-engine fetched datapoints")
+                    that.logger.info("script-engine fetched datapoints");
                     datapoints = dps;
                     that.initEventHandler();
                     that.startEngine();
@@ -87,9 +83,8 @@ var scriptEngine = {
         // Email Adapter
         if (scriptEngine.settings.adapters.email && scriptEngine.settings.adapters.email.enabled) {
             var nodemailer = require("nodemailer");
-            scriptEngine.emailTransport = nodemailer.createTransport(scriptEngine.settings.adapters.email.settings.transport,
-                scriptEngine.settings.adapters.email.settings.transportOptions
-            );
+            var  smtpTransport = require('nodemailer-smtp-transport');
+            scriptEngine.emailTransport = nodemailer.createTransport(smtpTransport(scriptEngine.settings.adapters.email.settings.transportOptions));
         }
 
     },
@@ -685,7 +680,7 @@ var scriptEngine = {
 function runScript(path) {
     scriptEngine.logger.verbose("script-engine loading "+path);
     var script = scriptEngine.fs.readFileSync(path);
-    // Todo use vm.runInContext
+    // Todo use vm.runInContext -> dschaedl: I don't think this will work as expected...
     //var context = scriptEngine.vm.createContext(global);
     //scriptEngine.vm.runInContext(script, context, path);
     //scriptEngine.vm.runInThisContext(script, path);
