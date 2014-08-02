@@ -277,14 +277,9 @@ function createSnapshot (isNotAnonymized, zipFileName) {
 
     var socket;
     if (settings.ioListenPort) {
-        socket = io.connect('127.0.0.1', {
-            port: settings.ioListenPort
-        });
+        socket = io("http://127.0.0.1:" + settings.ioListenPort);
     } else if (settings.ioListenPortSsl) {
-        socket = io.connect('127.0.0.1', {
-            port: settings.ioListenPortSsl,
-            secure: true
-        });
+        socket = io("https://127.0.0.1:" + settings.ioListenPortSsl);
     } else {
         return;
     }
