@@ -1,1 +1,0 @@
-{"enabled":true,"settings":{"transport":"SMTP","transportOptions":{"service":"Gmail","auth":{"user":"daniel@daniel.schaedler.name","pass":"77daniel"}},"defaults":{"from":"ccu.io<ccu.io@daniel.schaedler.name>","to":"homematic<homematic@daniel.schaedler.name","subject":"CCU.IO"}}}
