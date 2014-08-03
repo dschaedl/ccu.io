@@ -1045,7 +1045,11 @@ $(document).ready(function () {
         } else {
             $("#logging_enabled").removeAttr("checked");
         }
-        $("#logging_writeInterval").val(ccuIoSettings.logging.writeInterval);
+        $("#logging_level [value='" + (ccuIoSettings.logging.level || 'INFO') + "']").attr("selected", "selected");
+        $("#logging_level").change(function () {
+            ccuIoSettings.logging.level = ($(this).val());
+        });
+
 
         if (ccuIoSettings.scriptEngineEnabled) {
             $("#scriptEngineEnabled").attr("checked", true);
@@ -1151,7 +1155,8 @@ $(document).ready(function () {
         } else {
             ccuIoSettings.logging.enabled = false;
         }
-        ccuIoSettings.logging.writeInterval = $("#logging_writeInterval").val();
+        ccuIoSettings.logging.level = $("#logging_level").val();
+
 
         if ($("#scriptEngineEnabled").is(":checked")) {
             ccuIoSettings.scriptEngineEnabled = true;
@@ -1243,7 +1248,7 @@ $(document).ready(function () {
         var settingsWithoutAdapters = JSON.parse(JSON.stringify(ccuIoSettings));
         delete settingsWithoutAdapters.adapters;
         socket.emit("writeFile", "io-settings.json", settingsWithoutAdapters, function () {
-            showMessage("CCU.IO settings saved. Please restart CCU.IO");
+            showMessage("CCU.IO settings saved. Please restart CCU.IO (Log-level is changed immediately)");
         });
     }
 
