@@ -21,11 +21,12 @@ var fs =        require('fs'),
 var scriptEngine = {
     util:           require('util'),
     settings:       require(__dirname+'/settings.js'),
-    logger:         require(__dirname+'/logger.js'),
+    log4js:         require('log4js'),
     //vm:             require('vm'),
     io:             require('socket.io-client'),
     scheduler:      require('node-schedule'),
     suncalc:        require('suncalc'),
+    logger:         null,
     fs:             fs,
     scriptDir:      __dirname + '/scripts',
     socket: {},
@@ -36,6 +37,7 @@ var scriptEngine = {
 
     init: function () {
         var that = this;
+
         if (that.settings.ioListenPort) {
             that.socket = that.io("http://127.0.0.1:" + that.settings.ioListenPort);
         } else if (settings.ioListenPortSsl) {
@@ -678,7 +680,7 @@ var scriptEngine = {
 }
 
 function runScript(path) {
-    scriptEngine.logger.verbose("script-engine loading "+path);
+    scriptEngine.logger.debug("script-engine loading "+path);
     var script = scriptEngine.fs.readFileSync(path);
     // Todo use vm.runInContext -> dschaedl: I don't think this will work as expected...
     //var context = scriptEngine.vm.createContext(global);
@@ -932,6 +934,10 @@ process.on('SIGINT', function () {
 process.on('SIGTERM', function () {
     scriptEngine.stop();
 });
+
+// init logging
+scriptEngine.log4js.configure('log4js.json', {reloadSecs: 600});
+scriptEngine.logger = scriptEngine.log4js.getLogger('scriptengine');
 
 try {
     // Check if file exists

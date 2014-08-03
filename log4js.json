@@ -1,0 +1,30 @@
+{
+    "appenders": [
+        {
+            "category": "ccu.io",
+            "type": "file",
+            "filename": "log/log4j.ccu.io.log",
+            "maxLogSize": 20480,
+            "backups": 10
+        },
+        {
+            "category": "scriptengine",
+            "type": "file",
+            "filename": "log/scriptEngine.log",
+            "maxLogSize": 20480,
+            "backups": 10
+        },
+        {
+            "category": "ccu.io.daily",
+            "level": "INFO",
+            "type": "dateFile",
+            "filename": "log/ccu.io.log",
+            "pattern": ".yyyy-MM-dd",
+            "alwaysIncludePattern": false,
+            "layout": {
+                "type": "pattern",
+                "pattern": "%d{ABSOLUTE} %[%-5p%] %c %m"
+            }
+        }
+    ]
+}
