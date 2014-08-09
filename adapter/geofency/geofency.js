@@ -18,6 +18,8 @@ var geoSettings = settings.adapters.geofency.settings,
     express =   require('express'),
     logger =    require(__dirname+'/../../logger.js'),
     io =        require('socket.io-client'),
+    expressBasicAuth = require('basic-auth-connect');
+    bodyparser = require('body-parser'),
     app =       express();
 
 if (settings.ioListenPort) {
@@ -57,7 +59,7 @@ process.on('SIGTERM', function () {
 });
 
 
-app.use(express.basicAuth(geoSettings.user, geoSettings.pass));
+app.use(expressBasicAuth(geoSettings.user, geoSettings.pass));
 
 if (geoSettings.ssl) {
     var fs = require('fs');
@@ -96,7 +98,7 @@ for (var i = 0; i < geoSettings.devices.length; i++) {
     });
 }
 
-app.use(express.bodyParser({}));
+app.use(bodyparser.json());
 app.post('/*', function (req, res) {
     res.set('Content-Type', 'text/html');
     var id = parseInt(req.path.slice(1), 10);

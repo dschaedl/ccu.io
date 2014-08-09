@@ -959,7 +959,7 @@ process.on('SIGTERM', function () {
 
 // init logging
 scriptEngine.log4js.configure('log4js.json', {reloadSecs: 600});
-scriptEngine.logger = scriptEngine.log4js.getLogger('scriptengine');
+scriptEngine.logger = scriptEngine.log4js.getLogger('scriptengine.daily');
 
 try {
     // Check if file exists

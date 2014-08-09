@@ -8,11 +8,15 @@
             "backups": 10
         },
         {
-            "category": "scriptengine",
-            "type": "file",
+            "category": "scriptengine.daily",
+            "type": "dateFile",
             "filename": "log/scriptEngine.log",
-            "maxLogSize": 20480,
-            "backups": 10
+            "pattern": ".yyyy-MM-dd",
+            "alwaysIncludePattern": false,
+            "layout": {
+                "type": "pattern",
+                "pattern": "%d{ABSOLUTE} %[%-5p%] %c %m"
+            }
         },
         {
             "category": "ccu.io.daily",
