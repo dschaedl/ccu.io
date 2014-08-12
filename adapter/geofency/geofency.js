@@ -18,19 +18,14 @@ var geoSettings = settings.adapters.geofency.settings,
     express =   require('express'),
     logger =    require(__dirname+'/../../logger.js'),
     io =        require('socket.io-client'),
-    expressBasicAuth = require('basic-auth-connect');
+    expressBasicAuth = require('basic-auth-connect'),
     bodyparser = require('body-parser'),
     app =       express();
 
 if (settings.ioListenPort) {
-    var socket = io.connect("127.0.0.1", {
-        port: settings.ioListenPort
-    });
+    socket = io("http://127.0.0.1:" + settings.ioListenPort);
 } else if (settings.ioListenPortSsl) {
-    var socket = io.connect("127.0.0.1", {
-        port: settings.ioListenPortSsl,
-        secure: true
-    });
+    socket = io("https://127.0.0.1:" + settings.ioListenPortSsl);
 } else {
     process.exit();
 }
@@ -98,7 +93,8 @@ for (var i = 0; i < geoSettings.devices.length; i++) {
     });
 }
 
-app.use(bodyparser.json());
+app.use(bodyparser.json({type:'*/json'}));
+//app.use(bodyparser.text());
 app.post('/*', function (req, res) {
     res.set('Content-Type', 'text/html');
     var id = parseInt(req.path.slice(1), 10);
