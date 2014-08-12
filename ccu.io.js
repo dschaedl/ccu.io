@@ -13,9 +13,10 @@
 
 var settings = require(__dirname+'/settings.js');
 
-settings.version = "1.0.45";
+settings.version = "1.0.44";
 settings.basedir = __dirname;
 settings.datastorePath = __dirname+"/datastore/";
+settings.logPath = __dirname + "/log/";
 settings.stringTableLanguage = settings.stringTableLanguage || "de";
 
 settings.regahss.metaScripts = [
@@ -39,6 +40,7 @@ var fs =        require('fs'),
     binrpc =    require(__dirname + "/binrpc.js"),
     rega =      require(__dirname + "/rega.js"),
     express =   require('express'),
+    expressBasicAuth = require('basic-auth-connect'),
     http =      require('http'),
     https =     require('https'),
     crypto =    require('crypto'),
@@ -49,6 +51,9 @@ var fs =        require('fs'),
     scheduler = require('node-schedule'),
     mime =      require('mime'),
     os =        require('os'),
+    bodyparser = require('body-parser'),
+    tail =      require('tail').Tail,
+    tailedFile,
     app,
     appSsl,
     server,
@@ -89,7 +94,7 @@ if (settings.ioListenPort) {
     app =  express();
 
     if (settings.authentication && settings.authentication.enabled) {
-        app.use(express.basicAuth(settings.authentication.user, settings.authentication.password));
+        app.use(expressBasicAuth(settings.authentication.user, settings.authentication.password));
     }
 
     server = require('http').createServer(app);
@@ -119,7 +124,7 @@ if (settings.ioListenPortSsl) {
     if (options) {
         appSsl = express();
         if (settings.authentication && settings.authentication.enabledSsl) {
-            appSsl.use(express.basicAuth(settings.authentication.user, settings.authentication.password));
+            appSsl.use(expressBasicAuth(settings.authentication.user, settings.authentication.password));
         }
         serverSsl = require('https').createServer(options, appSsl);
         if (settings.useIPv6) {
@@ -1042,6 +1047,20 @@ function restApi(req, res) {
             response = datapoints;
             status = 200;
             break;
+        case "restartScriptEngine":
+            response = "no script Engine enabled";
+            if (settings.scriptEngineEnabled) {
+                if (childScriptEngine) {
+                    childScriptEngine.kill();
+                    delete childScriptEngine;
+                }
+                setTimeout(function () {
+                    startScriptEngine();
+                }, 1500);
+                response = "restarting Script Engine";
+            }
+            status = 200;
+            break;
         default:
             response = {error: "command " + command + " unknown"};
     }
@@ -1085,7 +1104,7 @@ function initWebserver() {
         }
 
         // File Uploads
-        app.use(express.bodyParser({uploadDir: __dirname + '/tmp'}));
+        app.use(bodyparser.urlencoded({uploadDir: __dirname + '/tmp', extended: true}));
         app.post('/upload', uploadParser);
 
         app.get('/api/*', restApi);
@@ -1117,7 +1136,7 @@ function initWebserver() {
         }
 
         // File Uploads
-        appSsl.use(express.bodyParser({uploadDir: __dirname + '/tmp'}));
+        appSsl.use(bodyparser.urlencoded({uploadDir: __dirname + '/tmp', extended: true}));
         appSsl.post('/upload', uploadParser);
 
         appSsl.get('/api/*', restApi);
@@ -1370,6 +1389,7 @@ function clearRegaData() {
 }
 
 function initSocketIO(_io) {
+    /*
     _io.set('logger', {
         debug: function(obj) {
             logger.debug("socket.io: "+obj);
@@ -1384,8 +1404,11 @@ function initSocketIO(_io) {
             logger.warn("socket.io: "+obj);
         }
     });
+    */
 
-	_io.configure(function () {
+	_io.use(function (socket, next) {
+        //this.set('heartbeat timeout', 25);
+        //this.set('heartbeat interval', 10);
 
         var handshakeData = socket.request;
         var isHttps = (serverSsl !== undefined && this.server == serverSsl);
@@ -1403,7 +1426,7 @@ function initSocketIO(_io) {
                 next();
             }
         } else {
-            next();
+           next();
         }
     });
 
@@ -1821,6 +1844,55 @@ function initSocketIO(_io) {
             });
         });
 
+        socket.on('readLogFile', function (name, callback) {
+            logger.debug("socket.io <-- readLogFile " + name);
+
+            fs.readFile(settings.logPath + name, "utf-8", function (err, data) {
+                if (err) {
+                    logger.error("ccu.io        failed loading file "+settings.logPath+name);
+                    callback(undefined);
+                } else {
+                    try {
+                        var obj = data;
+                        callback(obj);
+                    } catch (e) {
+                        logger.warn("ccu.io        failed parsing file "+settings.logPath+name);
+                        callback(null, e);
+                    }
+
+                }
+            });
+        });
+
+        socket.on('tailLogFile', function(name, callback) {
+            logger.debug("socket.io <-- tailing on file: " + name);
+
+            // reset tailed file first
+            if (tailedFile) {
+                tailedFile.unwatch();
+                tailedFile = null;
+            }
+            tailedFile = new tail(settings.logPath + name);
+
+            tailedFile.on('line', function(data) {
+                // DO NOT LOG HERE -> it will be recursive...
+                //logger.debug("socket.io -> sending log-line from " + name);
+                socket.emit('appendToLog', [data], function(data){});
+            });
+            tailedFile.on('error', function(data) {
+                logger.debug("socket.io:   error on tail of " + name);
+                tailedFile.unwatch();
+            });
+        });
+
+        socket.on('unTailLogFile', function(callback) {
+            logger.debug("socket.io <-- Un-tailing watched file");
+            if (tailedFile) {
+                tailedFile.unwatch();
+            }
+            tailedFile = null;
+        });
+
         socket.on('readRawFile', function (name, callback) {
             logger.debug("socket.io <-- readFile "+name);
 
@@ -2231,8 +2303,8 @@ function initSocketIO(_io) {
 
 function startScriptEngine() {
     var path = __dirname + "/script-engine.js";
-    logger.info("ccu.io        starting script-engine");
     childScriptEngine = childProcess.fork(path);
+    logger.info("ccu.io        starting script-engine");
 }
 
 function restartAdapter(adapter) {

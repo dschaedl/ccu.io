@@ -20,7 +20,6 @@
         },
         {
             "category": "ccu.io.daily",
-            "level": "INFO",
             "type": "dateFile",
             "filename": "log/ccu.io.log",
             "pattern": ".yyyy-MM-dd",
@@ -30,5 +29,10 @@
                 "pattern": "%d{ABSOLUTE} %[%-5p%] %c %m"
             }
         }
-    ]
+    ],
+    "levels": {
+        "[all]": "INFO",
+        "ccu.io.daily": "INFO",
+        "scriptengine.daily": "INFOS"
+    }
 }
