@@ -28,11 +28,23 @@
                 "type": "pattern",
                 "pattern": "%d{ABSOLUTE} %[%-5p%] %c %m"
             }
+        },
+        {
+            "category": "devices-variables",
+            "type": "dateFile",
+            "filename": "log/devices-variables.log",
+            "pattern": ".yyyy-MM-dd",
+            "alwaysIncludePattern": false,
+            "layout": {
+                "type": "pattern",
+                "pattern": "%m"
+            }
         }
     ],
     "levels": {
         "[all]": "INFO",
         "ccu.io.daily": "INFO",
-        "scriptengine.daily": "INFOS"
+        "scriptengine.daily": "INFO",
+        "devices-variables": "DEBUG"
     }
 }

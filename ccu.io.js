@@ -36,6 +36,7 @@ settings.regahss.metaScripts = [
 var fs =        require('fs'),
     //logger =    require(__dirname + '/logger.js'),
     logger,
+    logger_dv,
     log4js =    require('log4js'),
     binrpc =    require(__dirname + "/binrpc.js"),
     rega =      require(__dirname + "/rega.js"),
@@ -64,7 +65,6 @@ var fs =        require('fs'),
     ioSsl,
     ioV6,
     ioSslV6,
-    devlogCache = [],
     notFirstVarUpdate = false,
     children = [],
     childrenAdapter = {},
@@ -89,6 +89,8 @@ var fs =        require('fs'),
 log4js.configure(__dirname + '/log4js.json');
 logger = log4js.getLogger('ccu.io.daily');
 logger.setLevel(settings.logging.level);
+// and the device-variables logging
+logger_dv = log4js.getLogger('devices-variables');
 
 if (settings.ioListenPort) {
     app =  express();
@@ -265,18 +267,6 @@ function updateStatus () {
         initsDone: initsDone
     }
     emitEvent("updateStatus", status);
-}
-
-
-
-if (settings.logging.enabled) {
-    //setInterval(writeLog, settings.logging.writeInterval * 1000);
-    logger.info("ccu.io        changing log-level according settings to: " + settings.logging.level);
-    if (settings.logging.move) {
-        scheduler.scheduleJob('0 0 * * *', function(){
-            moveLog(settings.logging.file);
-        });
-    }
 }
 
 function emitEvent(msg, arg) {
@@ -2552,54 +2542,6 @@ function quit() {
     }
 }
 
-function cacheLog(str) {
-    devlogCache.push(str);
-}
-
-var logMoving = [];
-
-function writeLog() {
-
-    if (logMoving[settings.logging.file]) {
-        setTimeout(writeLog, 250);
-        return false;
-    }
-
-    var tmp = devlogCache;
-    devlogCache = [];
-
-    var l = tmp.length;
-    logger.debug("ccu.io        writing "+l+" lines to "+settings.logging.file);
-
-    var file = __dirname+"/log/"+settings.logging.file;
-
-    fs.appendFile(file, tmp.join(""), function (err) {
-        if (err) {
-            logger.error("ccu.io        writing to "+settings.logging.file + " error: "+JSON.stringify(err));
-        }
-    });
-
-}
-
-function moveLog(file) {
-    logMoving[file] = true;
-    setTimeout(moveLog, 86400000);
-    var ts = (new Date()).getTime() - 3600000;
-    ts = new Date(ts);
-
-
-    var timestamp = ts.getFullYear() + '-' +
-        ("0" + (ts.getMonth() + 1).toString(10)).slice(-2) + '-' +
-        ("0" + (ts.getDate()).toString(10)).slice(-2);
-
-    logger.info("ccu.io        moving Logfile "+file+" "+timestamp);
-
-    fs.rename(__dirname+"/log/"+file, __dirname+"/log/"+file+"."+timestamp, function() {
-        logMoving[file] = false;
-    });
-
-}
-
 function devLog(ts, id, val) {
 
     if (typeof val === "string") {
@@ -2609,7 +2551,7 @@ function devLog(ts, id, val) {
             val = parseFloat(val);
         }
     }
-    cacheLog(ts+" "+id+" "+JSON.stringify(val)+"\n");
+    logger_dv.debug(ts + " " + id + " " + JSON.stringify(val));
 }
 
 function savePersistentObjects() {
